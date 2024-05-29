@@ -1,9 +1,9 @@
 import random
 import string
 import time
- 
+
 from flask import Flask, jsonify, request
- 
+
 app = Flask(__name__, template_folder='templates')
  
  
@@ -88,6 +88,9 @@ def accept_pairing():
  
     pc_id = entry["pc_id"]
     pc_name = entry["pc_name"]
+
+    # Delete the pairing code from the database
+    del pairing_codes[pairing_code]
  
     # Store the devices in the database
     # "partner_device" associates the two devices
@@ -293,12 +296,16 @@ def verify_2fa():
  
     # Check if the comparison code matches
     if awaiting_request["comparison_code"] == comparison_code:
-        awaiting_request["signal"] = True  # Signal success to /2fa/await
-        return jsonify({"verified": True}), 200
+        awaiting_request["signal"] = True  # Signal success to to /2fa/await
+        response = jsonify({"verified": True}), 200
     else:
-        awaiting_request["signal"] = False  # Signal failure /2fa/await
-        return jsonify({"verified": False}), 200
- 
+        awaiting_request["signal"] = False  # Signal failure to /2fa/await
+        response = jsonify({"verified": False}), 200
+
+        # Remove the 2FA request from the database
+        del awaiting_2fa[smartphone_id]
+
+    return response
  
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=6000)
+    app.run(debug=True)
