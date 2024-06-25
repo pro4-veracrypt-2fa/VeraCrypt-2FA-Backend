@@ -163,7 +163,7 @@ def push_2fa():
     # Store the comparison code in the awaiting_2fa database
     awaiting_2fa[device["partner_device_id"]] = {
         "comparison_code": comparison_code,
-        "signal": None  # Initialize the signal as None
+        "signal": "Waiting"
     }
 
     # Return the comparison code to the PC for it to display
@@ -205,14 +205,16 @@ def pc_await():
     if awaiting_request is None:
         return Response(status=400, headers={"Error": "No 2FA request awaiting"})
 
-    # Polling loop to wait for the signal
-    while True:
-        if awaiting_request["signal"] is not None:
-            result = awaiting_request["signal"]
-            del awaiting_2fa[device["partner_device_id"]]
-            return Response(headers={"Verified": str(result)})
-        
-        time.sleep(1)  # Sleep for a short duration before polling again
+    if awaiting_request["signal"] is not None:
+        result = awaiting_request["signal"]
+        if result == "Approved":
+            return Response(headers={"X-2FA-Authorization": "Approved"})
+        elif result == "Denied":
+            return Response(headers={"X-2FA-Authorization": "Denied"})
+        else:
+            return Response(headers={"X-2FA-Authorization": "Waiting"})
+    else:
+        return Response(headers={"Error": "No signal received"})
 
 
 # Called by the smartphone
@@ -276,10 +278,10 @@ def verify_2fa():
 
     # Check if the comparison code matches
     if awaiting_request["comparison_code"] == comparison_code:
-        awaiting_request["signal"] = True  # Signal success to to /2fa/await
+        awaiting_request["signal"] = "Approved"  # Signal success to to /2fa/await
         response = Response(headers={"Verified": "True"})
     else:
-        awaiting_request["signal"] = False  # Signal failure to /2fa/await
+        awaiting_request["signal"] = "Denied"  # Signal failure to /2fa/await
         response = Response(headers={"Verified": "False"})
 
     # Remove the 2FA request from the database
